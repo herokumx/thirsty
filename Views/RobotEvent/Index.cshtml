@@ -1,0 +1,142 @@
+﻿@{
+    ViewData["Title"] = "Robot Arm";
+}
+
+<div class="mobile-content">
+    <table class="mobile-monitor">
+        <tr>
+            <td>
+                <img id="imgStatus" src="/images/robot-normal.png" data-both-fault="/images/both-fault.png" data-normal="/images/robot-normal.png" data-robot-fault="/images/robot-fault.png" data-ctrl-fault="/images/ctrl-fault.png" alt="car" />
+            </td>
+        </tr>
+        <tr>
+            <td class="mobile-monitor-action">
+                <table>
+                    <tr>
+                        <td>
+                            <label class="checkbox" style="margin:20% 0px 0px 20%;white-space: nowrap;">
+                                <input type="checkbox" id="isRobotFault" style="margin-top:0px;">
+                                <span>Simulate Ice Fault</span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <label class="checkbox" style="margin:20% 0px 0px 20%;white-space: nowrap;">
+                                <input type="checkbox" id="isCtrlFault" style="margin-top:0px;">
+                                <span>Simulate Flavor Fault</span>
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div id="lblMessage" style="margin-top:5%;">&nbsp;</div>
+                <input id="btnSend" type="button" value="Start Sending Data" class="btn-custom"/>
+            </td>
+        </tr>
+    </table>
+</div>
+
+@section Scripts{
+    <script type="text/javascript">
+        var urlAction = '/RobotEvent/SendData';
+        var isSentData = false, httpRequestLimit = 30, httpRequestCount = 0;
+        var startProcess, btnText, btnBgColor;
+
+        $(function () {
+            $('#spinner').hide();
+            $('#lblMessage').addClass('default-status-message').html('&nbsp;');
+            $('#btnSend').on('click', function (e) {
+                isSentData = !isSentData;
+                btnText = btnBgColor = undefined;
+                ttpRequestCount = 0;
+
+                if (isSentData && startProcess == undefined) {
+                    $('#lblMessage').css({ 'background-color': '' }).html('&nbsp;');
+                    startSendingData();
+                    startProcess = setInterval(function () { startSendingData() }, 5000);
+                }
+                else {
+                    stopSendingData();
+                }
+            });
+
+            $('input[type=checkbox]').on('click', function (e) {
+                var isRobotFault = $('#isRobotFault').is(":checked");
+                var isCtrlFault = $('#isCtrlFault').is(":checked");
+                var newSrc;
+                if (isRobotFault && isCtrlFault) {
+                    newSrc = $("#imgStatus").attr('data-both-fault');
+                }
+                else if (isRobotFault) {
+                    newSrc = $("#imgStatus").attr('data-robot-fault');
+                }
+                else if (isCtrlFault) {
+                    newSrc = $("#imgStatus").attr('data-ctrl-fault');
+                }
+                else {
+                    newSrc = $("#imgStatus").attr('data-normal');
+                }
+
+                if (newSrc && $("#imgStatus").attr('src') != newSrc)
+                    $("#imgStatus").attr('src', newSrc);
+            });
+        });
+
+        function stopSendingData() {
+            isSentData = false;
+            httpRequestCount = 0;
+            if (startProcess) {
+                clearInterval(startProcess);
+                startProcess = undefined;
+            }
+            if ($) {
+                $('#btnSend').attr('value', 'Start Sending Data');
+                $('#lblMessage').css({ 'background-color': '' }).html('&nbsp;');
+                $('#spinner').hide();
+            }
+        }
+
+        function startSendingData() {
+            if (startProcess && isSentData)
+                return;
+            isSentData = true;
+            httpRequestCount++;
+            if (isSentData) {
+                $('#btnSend').attr('value', (isSentData ? 'Stop Sending Data' : 'Start Sending Data'));
+                var isRobotFault = $('#isRobotFault').is(":checked");
+                var isCtrlFault = $('#isCtrlFault').is(":checked");
+                $('#spinner').hide();
+                $.post(urlAction, { isRobotFault: isRobotFault, isCtrlFault: isCtrlFault }, function (data) {
+                    isSentData = false;
+                    $('#spinner').hide();
+                    if (data) {
+                        console.log(data);
+                        if (data.toLowerCase().indexOf("completed") != -1) {
+                            btnBgColor = "green";
+                            btnText = "Completed Successfully";
+                            stopSendingData();
+                        }
+                    }
+
+                    if (btnText && btnBgColor) {
+                        $('#lblMessage').css({
+                            'background-color': btnBgColor,
+                        }).html(btnText);
+                        return;
+                    }
+                    else {
+                        $('#lblMessage').addClass('default-status-message').html('&nbsp;');
+                    }
+
+                    if (httpRequestCount == httpRequestLimit) {
+                        stopSendingData();
+                    }
+                });
+            }
+        }
+    </script>
+}
